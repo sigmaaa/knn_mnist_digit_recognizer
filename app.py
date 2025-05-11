@@ -184,4 +184,4 @@ def update_neighbors(tab_value, distance, test_idx):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)
