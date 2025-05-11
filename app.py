@@ -26,8 +26,9 @@ image_src = f"data:image/png;base64,{encoded_image}"
 # Prepare dataset
 n_samples = len(digits.images)
 data = digits.images.reshape((n_samples, -1))
+
 X_train, X_test, y_train, y_test = train_test_split(
-    data, digits.target, test_size=0.8, shuffle=False
+    data, digits.target, test_size=0.2, shuffle=False
 )
 
 # Precompute results for each (k, distance)
@@ -36,6 +37,8 @@ for k in [3, 5, 7]:
     for distance in [KNN.EUCLIDEAN, KNN.MANHATTAN]:
         model = KNN(k=k, distance=distance, x_train=X_train, y_train=y_train)
         y_pred = model.predict(X_test)
+
+        # Classification result table
         table_data = [
             {
                 "Index": i,
@@ -45,10 +48,23 @@ for k in [3, 5, 7]:
             }
             for i, (true, pred) in enumerate(zip(y_test, y_pred))
         ]
+
+        # Example neighbor distances for first test sample
+        test_point = X_test[0]
+        # assumes method returns [(dist, label), ...]
+        neighbors = model.get_neighbors(test_point)
+
+        neighbor_info = [
+            {"Label": label, "Distance": float(dist)}
+            for dist, label in neighbors
+        ]
+
+        # Store all results
         accuracy = np.mean(y_pred == y_test)
         precomputed_results[(k, distance)] = {
             "data": table_data,
-            "accuracy": round(accuracy, 4)
+            "accuracy": round(accuracy, 4),
+            "neighbors": neighbor_info
         }
 
 # Create Dash app
@@ -57,6 +73,7 @@ app.layout = html.Div([
     html.H1("KNN Dashboard"),
     html.H2("Digit Samples"),
     html.Img(src=image_src),
+
     html.Div([
         html.Label("Select distance metric:"),
         dcc.Dropdown(
@@ -69,11 +86,26 @@ app.layout = html.Div([
             clearable=False
         )
     ], style={'width': '30%', 'margin-bottom': '20px'}),
+
+    html.Div([
+        html.H2("Explore Neighbors for Test Samples"),
+        dcc.Slider(
+            id='index-slider',
+            min=0,
+            max=len(X_test) - 1,
+            step=1,
+            value=0,
+            marks={0: '0', len(X_test) - 1: str(len(X_test) - 1)},
+            tooltip={"placement": "bottom", "always_visible": True}
+        ),
+        html.Div(id='neighbor-table-output')
+    ], style={'margin-top': '40px'}),
     dcc.Tabs(id="tabs-k", value='k-3', children=[
         dcc.Tab(label='k=3', value='k-3'),
         dcc.Tab(label='k=5', value='k-5'),
         dcc.Tab(label='k=7', value='k-7')
     ]),
+
     html.Div(id='tabs-content')
 ])
 
@@ -112,6 +144,41 @@ def update_output(tab_value, distance):
                     'backgroundColor': '#e6ffe6',
                 },
             ]
+        )
+    ])
+
+
+@app.callback(
+    Output('neighbor-table-output', 'children'),
+    Input('tabs-k', 'value'),
+    Input('distance-dropdown', 'value'),
+    Input('index-slider', 'value')
+)
+def update_neighbors(tab_value, distance, test_idx):
+    k_value = int(tab_value.split('-')[1])
+    model = KNN(k=k_value, distance=distance, x_train=X_train, y_train=y_train)
+
+    test_point = X_test[test_idx]
+    # should return [(dist, label), ...]
+    neighbors = model.get_neighbors(test_point)
+
+    neighbor_info = [
+        {"Label": label, "Distance": float(dist)}
+        for dist, label in neighbors
+    ]
+
+    return html.Div([
+        html.H3(f"Neighbors for Test Sample Index {test_idx}"),
+        dash_table.DataTable(
+            data=neighbor_info,
+            columns=[
+                {"name": "Label", "id": "Label"},
+                {"name": "Distance", "id": "Distance"}
+            ],
+            style_table={'overflowX': 'auto'},
+            style_cell={'textAlign': 'center'},
+            page_size=10,
+            sort_action="native"
         )
     ])
 
