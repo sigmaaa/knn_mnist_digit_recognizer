@@ -26,6 +26,7 @@ image_src = f"data:image/png;base64,{encoded_image}"
 # Prepare dataset
 n_samples = len(digits.images)
 data = digits.images.reshape((n_samples, -1))
+data = data/16.0
 
 X_train, X_test, y_train, y_test = train_test_split(
     data, digits.target, test_size=0.2, shuffle=False
